@@ -45,7 +45,7 @@ protected:
   }
 
   PluginASTAction::ActionType getActionType() override {
-    return AddAfterMainAction;
+    return AddBeforeMainAction;
   }
 };
 
