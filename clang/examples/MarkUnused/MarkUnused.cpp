@@ -1,27 +1,31 @@
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/FrontendPluginRegistry.h"
 #include "clang/AST/ASTConsumer.h"
-#include "llvm/Support/raw_ostream.h"
 
 using namespace clang;
 
 namespace {
 
-class MarkUnusedConsumer : public ASTConsumer {
+class MarkUnusedVisitor : public RecursiveASTVisitor<MarkUnusedVisitor> {
 public:
-    bool HandleTopLevelDecl(DeclGroupRef DG) override {
-    	for (Decl *D : DG) {
-            if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
-                if (!VD->hasAttr<UnusedAttr>() && !VD->isUsed(false)) {
-                    VD->addAttr(UnusedAttr::CreateImplicit(VD->getASTContext(),
-                                                           VD->getLocation()));
-                    VD->setIsUsed();
-                }
-            }
+    bool VisitVarDecl(VarDecl *VD) {
+        if (!VD->hasAttr<UnusedAttr>() && !VD->isUsed(false)) {
+            VD->addAttr(UnusedAttr::CreateImplicit(VD->getASTContext(),
+                                                   VD->getLocation()));
+            VD->setIsUsed();
         }
         return true;
+    }
+};
+
+class MarkUnusedConsumer : public ASTConsumer {
+public:
+    void HandleTranslationUnit(ASTContext &Context) override {
+        MarkUnusedVisitor Visitor;
+        Visitor.TraverseDecl(Context.getTranslationUnitDecl());
     }
 };
 
