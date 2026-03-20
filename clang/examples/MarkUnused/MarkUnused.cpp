@@ -1,52 +1,45 @@
 #include "clang/AST/Attr.h"
-#include "clang/AST/RecursiveASTVisitor.h"
+#include "clang/AST/Decl.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/FrontendPluginRegistry.h"
+#include "clang/AST/ASTConsumer.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace clang;
 
 namespace {
 
-class MarkUnusedVisitor : public RecursiveASTVisitor<MarkUnusedVisitor> {
-public:
-  explicit MarkUnusedVisitor(ASTContext &Context) {}
-
-  bool VisitVarDecl(VarDecl *VD) {
-    if (VD && !VD->hasAttr<UnusedAttr>() && !VD->isUsed(false)) {
-      VD->addAttr(UnusedAttr::CreateImplicit(VD->getASTContext(),
-                                             VD->getLocation()));
-    }
-    return true;
-  }
-};
-
 class MarkUnusedConsumer : public ASTConsumer {
 public:
-  explicit MarkUnusedConsumer(ASTContext &Context) : Visitor(Context) {}
-
-  void HandleTranslationUnit(ASTContext &Context) override {
-    Visitor.TraverseDecl(Context.getTranslationUnitDecl());
-  }
-
-private:
-  MarkUnusedVisitor Visitor;
+    bool HandleTopLevelDecl(DeclGroupRef DG) override {
+    	for (Decl *D : DG) {
+            if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
+                if (!VD->hasAttr<UnusedAttr>() && !VD->isUsed(false)) {
+                    VD->addAttr(UnusedAttr::CreateImplicit(VD->getASTContext(),
+                                                           VD->getLocation()));
+                    VD->setIsUsed();
+                }
+            }
+        }
+        return true;
+    }
 };
 
 class MarkUnusedAction : public PluginASTAction {
-protected:
-  std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI,
-                                                  llvm::StringRef) override {
-    return std::make_unique<MarkUnusedConsumer>(CI.getASTContext());
-  }
+public:
+    std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI,
+                                                    llvm::StringRef) override {
+        return std::make_unique<MarkUnusedConsumer>();
+    }
 
-  bool ParseArgs(const CompilerInstance &CI,
-                 const std::vector<std::string> &args) override {
-    return true;
-  }
+    bool ParseArgs(const CompilerInstance &CI,
+                   const std::vector<std::string> &args) override {
+        return true;
+    }
 
-  PluginASTAction::ActionType getActionType() override {
-    return AddBeforeMainAction;
-  }
+    PluginASTAction::ActionType getActionType() override {
+        return AddBeforeMainAction;
+    }
 };
 
 } // namespace
