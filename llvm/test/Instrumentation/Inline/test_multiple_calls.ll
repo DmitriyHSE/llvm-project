@@ -1,9 +1,8 @@
 define void @foo() {
-  %a = alloca i32
-  store i32 42, i32* %a
   ret void
 }
 define void @bar() {
+  call void @foo()
   call void @foo()
   ret void
 }
